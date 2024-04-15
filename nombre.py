@@ -478,3 +478,5 @@ def visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, nombre_ar
 # Ejemplo de uso
 # Suponiendo que ya tenemos los datos necesarios (tensiones, deformaciones, nodos, tetraedros)
 # visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, "resultados.vtk")
+
+# El Paraview se está descargando todavía, que tarda 500 años
