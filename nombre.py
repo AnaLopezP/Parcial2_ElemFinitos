@@ -1,43 +1,9 @@
-'''import numpy as np
-import pandas as pd 
-import meshpy.tet as tet
-from scipy.sparse import lil_matrix
-
-# 1. Crear un array de 10x10
-dominio = np.zeros((10, 10, 10))
-print(dominio) #10 matrices de 10x10
-
-# 2. Crear un CVS
-df = pd.DataFrame({'x': [0, 1], 'y': [0, 1], 'z': [0, 1], 'pressure': [100, 150]})
-df.to_csv('output.csv', index=False)
-
-# 3. Crear un tensor de deformación
-def tensor_deformacion(desplazamientos):
-    # Implementa el cálculo del gradiente de desplazamientos
-    # Este es un ejemplo simplificado
-    return np.gradient(desplazamientos)
-
-# 4. Generación de una malla de tetraedros
-points, facets = [ ... ], [ ... ]  # Define puntos y caras
-mesh_info = tet.MeshInfo()
-mesh_info.set_points(points)
-mesh_info.set_facets(facets)
-mesh = tet.build(mesh_info)
-
-# 5. Implementación de Función de forma
-def funcion_forma(punto, nodos):
-    # Implementa la función de forma para un punto y nodos
-    return np.ones(len(nodos))
-
-# 6. Ensamblaje de matrices
-K_global = lil_matrix((nodos_totales, nodos_totales))
-# Suma las matrices locales de rigidez al K_global en los índices correctos'''
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pyvtk
+import meshpy.tet as tet
 
 # PARTE 1
 dominio = np.zeros((10, 10, 10))
@@ -82,6 +48,7 @@ desplazamientos = np.array([0.1, 0.2, 0.15, 0.18])
 export_to_paraview('results.txt', presiones, desplazamientos)
 '''
 
+# PARTE 3
 def calcular_tensor_deformaciones(desplazamientos):
     """
     Calcula el tensor de deformaciones para un elemento finito tetraédrico.
@@ -118,9 +85,10 @@ desplazamientos = np.array([
 print("Tensor de deformaciones:")
 print(strain_tensor)'''
 
+# PARTE 4
 def generar_mallado_tetraedros(geometria):
     """
-    Genera un mallado de tetraedros a partir de una geometría proporcionada.
+    Genera un mallado de tetraedros usando meshpy.
 
     Args:
     - geometria: Datos de la geometría. Esto puede ser una lista de coordenadas de nodos y una lista de
@@ -130,13 +98,34 @@ def generar_mallado_tetraedros(geometria):
     - nodos: Coordenadas de los nodos del mallado.
     - tetraedros: Índices de nodos que forman los tetraedros del mallado.
     """
-    # Supongamos que la geometría se proporciona como una lista de coordenadas de nodos y una lista de índices de nodos
-    nodos = geometria['nodos']
-    tetraedros = geometria['tetraedros']
+   # Definir puntos y caras (facets)
+    points = np.array([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
+    ])
     
-    # Aquí podríamos realizar algún proceso de generación de elementos, como refinamiento o ajuste de la malla
+    facets = [
+        [0, 1, 2],
+        [0, 1, 3],
+        [1, 2, 3],
+        [0, 2, 3]
+    ]
     
-    return nodos, tetraedros
+    # Crear objeto MeshInfo y definir puntos y facetas
+    mesh_info = tet.MeshInfo()
+    mesh_info.set_points(points)
+    mesh_info.set_facets(facets)
+    
+    # Construir la malla
+    mesh = tet.build(mesh_info)
+    
+    # Obtener puntos y elementos de la malla
+    points = np.array(mesh.points)
+    elements = np.array(mesh.elements)
+    
+    return points, elements
 
 # Ejemplo de uso
 geometria_ejemplo = {
@@ -150,3 +139,29 @@ print(nodos_mallado)
 print("Tetraedros del mallado:")
 print(tetraedros_mallado)
 
+# PARTE 5
+def funcion_de_forma_tetraedro(xi, eta, zeta):
+    """
+    Calcula los valores de la función de forma para un elemento tetraédrico lineal.
+
+    Args:
+    - xi, eta, zeta: Coordenadas en el espacio paramétrico del tetraedro.
+
+    Returns:
+    - N: Vector de valores de la función de forma.
+    """
+    N = np.array([
+        1 - xi - eta - zeta,
+        xi,
+        eta,
+        zeta
+    ])
+    
+    return N
+
+# Ejemplo de uso
+xi = 0.2
+eta = 0.3
+zeta = 0.4
+N = funcion_de_forma_tetraedro(xi, eta, zeta)
+print("Valores de la función de forma:", N)
