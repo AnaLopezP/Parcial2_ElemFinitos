@@ -153,6 +153,11 @@ def ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades):
     matriz_rigidez_global = np.zeros((3*num_nodos, 3*num_nodos))
     
     # Iterar sobre los tetraedros y ensamblar la matriz de rigidez global
+    print(tetraedros)
+    print(num_nodos)
+    print(nodos_mallado)
+    print(nodos)
+    
     for tetraedro in tetraedros:
         # Calcular matriz de rigidez local para el tetraedro actual
         matriz_rigidez_local = calcular_matriz_rigidez_local(tetraedro, nodos, propiedades)
@@ -179,6 +184,11 @@ def calcular_matriz_rigidez_local(tetraedro, nodos, propiedades):
     nu = propiedades['nu'] # Coeficiente de Poisson
     
     # Coordenadas de los nodos del tetraedro
+    print("NODOS", nodos)
+    print("TETRAEDRO", tetraedro)
+    tetraedro = [0, 1, 2, 3]
+    print("TETRAEDRO", tetraedro)
+    tetraedro = [0, 1, 2, 3]
     x0, y0, z0 = nodos[tetraedro[0]]
     x1, y1, z1 = nodos[tetraedro[1]]
     x2, y2, z2 = nodos[tetraedro[2]]
@@ -456,7 +466,7 @@ def visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, nombre_ar
 # Ejemplo de uso
 presiones = np.array([1.5, 2.0, 1.8, 2.2])
 desplazamientos = np.array([0.1, 0.2, 0.15, 0.18])
-export_to_paraview('results.txt', presiones, desplazamientos)
+#export_to_paraview('results.txt', presiones, desplazamientos)
 
 desplazamientos = np.array([
     [0.1, 0.2, 0.3],
@@ -498,18 +508,19 @@ matriz_rigidez_local = calcular_matriz_rigidez_local(tetraedro, nodos, propiedad
 print("Matriz de rigidez local:")
 print(matriz_rigidez_local)  
 
-matriz_rigidez_global = ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades)
+matriz_rigidez_global = ensamblar_matriz_rigidez_global(nodos, tetraedros_mallado, propiedades)
 
+fuerzas = np.zeros(len(nodos_mallado) * 3)
 
 desplazamientos = resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas)
 print("Desplazamientos resultantes:")
 print(desplazamientos)
 
 
-tensiones, deformaciones = calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos, tetraedros, propiedades)
+tensiones, deformaciones = calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos_mallado, tetraedros_mallado, propiedades)
 print("Tensiones en los elementos:")
 print(tensiones)
 print("Deformaciones en los elementos:")
 print(deformaciones)
 
-visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, "resultados.vtk")
+visualizar_resultados(tensiones, deformaciones, nodos_mallado, tetraedros_mallado, "resultados.vtk")
