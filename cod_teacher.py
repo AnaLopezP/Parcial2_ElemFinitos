@@ -1,4 +1,4 @@
-import numpy as np
+'''import numpy as np
 import pandas as pd 
 import meshpy.tet as tet
 from scipy.sparse import lil_matrix
