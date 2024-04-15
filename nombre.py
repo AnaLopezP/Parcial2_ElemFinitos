@@ -37,6 +37,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import pyvtk
 
 # PARTE 1
 dominio = np.zeros((10, 10, 10))
@@ -69,9 +70,83 @@ def export_to_paraview(nombre, presiones, desplazamientos):
     - desplazamientos: Array de desplazamientos.
     """
     # crear una malla sin conexiones usando pyvtk
-    points = np.column_stack((np.arange(len(presiones)), np.zeros(len(presiones)), np.zeros(len(presiones))))
+    puntos = np.column_stack((np.arange(len(presiones)), np.zeros(len(presiones)), np.zeros(len(presiones))))
+    mesh = pyvtk.UnstructuredGrid(puntos, point_data={"Presiones": presiones, "Desplazamientos": desplazamientos})
 
-# Ejemplo de uso
+    #Lo pasamos a VTK
+    mesh.tofile(nombre)
+
+'''# Ejemplo de uso
 presiones = np.array([1.5, 2.0, 1.8, 2.2])
 desplazamientos = np.array([0.1, 0.2, 0.15, 0.18])
 export_to_paraview('results.txt', presiones, desplazamientos)
+'''
+
+def calcular_tensor_deformaciones(desplazamientos):
+    """
+    Calcula el tensor de deformaciones para un elemento finito tetraédrico.
+
+    Args:
+    - desplazamientos: Matriz de desplazamientos nodales. Debe ser una matriz 4x3, donde cada fila representa
+                     los desplazamientos nodales en un nodo (x, y, z).
+
+    Returns:
+    - strain_tensor: Tensor de deformaciones calculado.
+    """
+    # Definir las derivadas de las funciones de forma para un tetraedro lineal
+    #Es una matriz 3x4 porque en un elemento tetraédrico lineal, tenemos 4 nodos, y cada nodo tiene tres grados de libertad
+    B = np.array([
+        [-1, 1, 0, 0],
+        [-1, 0, 1, 0],
+        [-1, 0, 0, 1]
+    ])
+    
+    # Calcular el tensor de deformaciones
+    strain_tensor = np.dot(B, desplazamientos)
+    
+    return strain_tensor
+
+# Ejemplo de uso
+desplazamientos = np.array([
+    [0.1, 0.2, 0.3],
+    [0.2, 0.3, 0.4],
+    [0.3, 0.4, 0.5],
+    [0.4, 0.5, 0.6]
+])
+
+'''strain_tensor = calcular_tensor_deformaciones(desplazamientos)
+print("Tensor de deformaciones:")
+print(strain_tensor)'''
+
+def generar_mallado_tetraedros(geometria):
+    """
+    Genera un mallado de tetraedros a partir de una geometría proporcionada.
+
+    Args:
+    - geometria: Datos de la geometría. Esto puede ser una lista de coordenadas de nodos y una lista de
+                 índices de nodos que forman los tetraedros.
+
+    Returns:
+    - nodos: Coordenadas de los nodos del mallado.
+    - tetraedros: Índices de nodos que forman los tetraedros del mallado.
+    """
+    # Supongamos que la geometría se proporciona como una lista de coordenadas de nodos y una lista de índices de nodos
+    nodos = geometria['nodos']
+    tetraedros = geometria['tetraedros']
+    
+    # Aquí podríamos realizar algún proceso de generación de elementos, como refinamiento o ajuste de la malla
+    
+    return nodos, tetraedros
+
+# Ejemplo de uso
+geometria_ejemplo = {
+    'nodos': np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+    'tetraedros': np.array([[0, 1, 2, 3]])
+}
+
+nodos_mallado, tetraedros_mallado = generar_mallado_tetraedros(geometria_ejemplo)
+print("Nodos del mallado:")
+print(nodos_mallado)
+print("Tetraedros del mallado:")
+print(tetraedros_mallado)
+
