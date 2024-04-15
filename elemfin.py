@@ -27,6 +27,7 @@ ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 plt.show()
 
+
 # PARTE 2
 def export_to_paraview(nombre, presiones, desplazamientos):
     """
@@ -43,6 +44,7 @@ def export_to_paraview(nombre, presiones, desplazamientos):
 
     #Lo pasamos a VTK
     mesh.tofile(nombre)
+
 
 
 # PARTE 3
@@ -132,6 +134,7 @@ def funcion_de_forma_tetraedro(xi, eta, zeta):
     
     return N
 
+
 # PARTE 6
 def ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades):
     """
@@ -218,7 +221,8 @@ def calcular_matriz_rigidez_local(tetraedro, nodos, propiedades):
     matriz_rigidez_local = np.dot(np.dot(B.T, C), B) * detJ
 
     return matriz_rigidez_local
-    
+
+  
 def ensamblar_matriz_local(matriz_global, matriz_local, tetraedro):
     """
     Ensambla la matriz de rigidez local en la matriz de rigidez global.
@@ -242,6 +246,8 @@ def ensamblar_matriz_local(matriz_global, matriz_local, tetraedro):
         for p, q in enumerate([i, j, k, l]):
             matriz_global[3*n:3*(n+1), 3*q:3*(q+1)] += matriz_local_sparse[3*m:3*(m+1), 3*p:3*(p+1)]
 
+
+
 # PARTE 7
 def resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas):
     """
@@ -259,7 +265,11 @@ def resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas):
     
     return desplazamientos
 
+
 # PARTE 8
+# Suponiendo que ya tenemos los desplazamientos y la matriz de rigidez global
+
+import numpy as np
 
 def calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos, tetraedros, propiedades):
     """
@@ -313,31 +323,20 @@ def calcular_matriz_deformacion(coordenadas):
     Returns:
     - matriz_deformacion: Matriz de deformación del tetraedro.
     """
-    # Calculamos las derivadas de las funciones de forma para el elemento tetraédrico
-    dN_dxi = np.array([-1, 1, 0, 0])
-    dN_deta = np.array([-1, 0, 1, 0])
-    dN_dzeta = np.array([-1, 0, 0, 1])
-
-    # Jacobiano de la transformación
-    J = np.column_stack((coordenadas[1:] - coordenadas[0], coordenadas[2] - coordenadas[0], coordenadas[3] - coordenadas[0]))
-    invJ = np.linalg.inv(J)
-
-    # Matriz de deformación
-    B = np.zeros((6, 12))
-    for i in range(4):
-        B[0, 3*i] = dN_dxi[i]
-        B[1, 3*i+1] = dN_deta[i]
-        B[2, 3*i+2] = dN_dzeta[i]
-        B[3, 3*i] = dN_deta[i]
-        B[3, 3*i+1] = dN_dxi[i]
-        B[4, 3*i+1] = dN_dzeta[i]
-        B[4, 3*i+2] = dN_deta[i]
-        B[5, 3*i] = dN_dzeta[i]
-        B[5, 3*i+2] = dN_dxi[i]
-
-    matriz_deformacion = np.dot(B, invJ)
+    # Calcular la matriz de deformación utilizando las coordenadas de los nodos
+    x1, y1, z1 = coordenadas[0]
+    x2, y2, z2 = coordenadas[1]
+    x3, y3, z3 = coordenadas[2]
+    x4, y4, z4 = coordenadas[3]
+    
+    matriz_deformacion = np.array([
+        [x2 - x1, x3 - x1, x4 - x1],
+        [y2 - y1, y3 - y1, y4 - y1],
+        [z2 - z1, z3 - z1, z4 - z1]
+    ])
     
     return matriz_deformacion
+
 
 def calcular_deformaciones_elemento(matriz_deformacion, desplazamientos_nodales):
     """
@@ -350,10 +349,11 @@ def calcular_deformaciones_elemento(matriz_deformacion, desplazamientos_nodales)
     Returns:
     - deformaciones_elemento: Deformaciones en el elemento.
     """
-    # Calculamos las deformaciones multiplicando la matriz de deformación por los desplazamientos nodales
-    deformaciones_elemento = np.dot(matriz_deformacion, desplazamientos_nodales.flatten())
+    # Calcular las deformaciones en el elemento utilizando la matriz de deformación y los desplazamientos nodales
+    deformaciones_elemento = np.dot(matriz_deformacion, desplazamientos_nodales)
     
     return deformaciones_elemento
+
 
 def calcular_tensiones_elemento(deformaciones_elemento, propiedades):
     """
@@ -366,23 +366,12 @@ def calcular_tensiones_elemento(deformaciones_elemento, propiedades):
     Returns:
     - tensiones_elemento: Tensiones en el elemento.
     """
-    # Desempaquetar las propiedades del material
+    # Calcular las tensiones en el elemento utilizando las deformaciones y las propiedades del material
     E = propiedades['E']  # Módulo de elasticidad
     nu = propiedades['nu']  # Coeficiente de Poisson
-
-    # Calcular el tensor de deformaciones
-    epsilon = np.array([
-        [deformaciones_elemento[0]],
-        [deformaciones_elemento[1]],
-        [deformaciones_elemento[2]],
-        [deformaciones_elemento[3]],
-        [deformaciones_elemento[4]],
-        [deformaciones_elemento[5]]
-    ])
-
-    # Calcular el tensor de elasticidad
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    C = factor * np.array([
+    
+    # Calcular la matriz de elasticidad para un material isotrópico
+    C = (E / ((1 + nu) * (1 - 2 * nu))) * np.array([
         [1 - nu, nu, nu, 0, 0, 0],
         [nu, 1 - nu, nu, 0, 0, 0],
         [nu, nu, 1 - nu, 0, 0, 0],
@@ -390,11 +379,13 @@ def calcular_tensiones_elemento(deformaciones_elemento, propiedades):
         [0, 0, 0, 0, (1 - 2 * nu) / 2, 0],
         [0, 0, 0, 0, 0, (1 - 2 * nu) / 2]
     ])
-
-    # Calcular las tensiones
-    tensiones_elemento = np.dot(C, epsilon)
-
+    
+    # Calcular las tensiones en el elemento
+    tensiones_elemento = np.dot(C, deformaciones_elemento)
+    
     return tensiones_elemento
+
+
 
 def visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, nombre_archivo):
     """
@@ -459,3 +450,66 @@ def visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, nombre_ar
     writer.SetFileName(nombre_archivo)
     writer.SetInputData(grid)
     writer.Write()
+
+
+
+# Ejemplo de uso
+presiones = np.array([1.5, 2.0, 1.8, 2.2])
+desplazamientos = np.array([0.1, 0.2, 0.15, 0.18])
+export_to_paraview('results.txt', presiones, desplazamientos)
+
+desplazamientos = np.array([
+    [0.1, 0.2, 0.3],
+    [0.2, 0.3, 0.4],
+    [0.3, 0.4, 0.5],
+    [0.4, 0.5, 0.6]
+])
+
+strain_tensor = calcular_tensor_deformaciones(desplazamientos)
+print("Tensor de deformaciones:")
+print(strain_tensor)
+
+geometria_ejemplo = {
+    'nodos': np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+    'tetraedros': np.array([[0, 1, 2, 3]])
+}
+
+nodos_mallado, tetraedros_mallado = generar_mallado_tetraedros(geometria_ejemplo)
+print("Nodos del mallado:")
+print(nodos_mallado)
+print("Tetraedros del mallado:")
+print(tetraedros_mallado)
+
+xi = 0.2
+eta = 0.3
+zeta = 0.4
+N = funcion_de_forma_tetraedro(xi, eta, zeta)
+print("Valores de la función de forma:", N)
+
+nodos = np.array([
+    [0, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1]
+])
+tetraedro = [0, 1, 2, 3]
+propiedades = {'E': 1e6, 'nu': 0.3}
+matriz_rigidez_local = calcular_matriz_rigidez_local(tetraedro, nodos, propiedades)
+print("Matriz de rigidez local:")
+print(matriz_rigidez_local)  
+
+matriz_rigidez_global = ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades)
+
+
+desplazamientos = resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas)
+print("Desplazamientos resultantes:")
+print(desplazamientos)
+
+
+tensiones, deformaciones = calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos, tetraedros, propiedades)
+print("Tensiones en los elementos:")
+print(tensiones)
+print("Deformaciones en los elementos:")
+print(deformaciones)
+
+visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, "resultados.vtk")
