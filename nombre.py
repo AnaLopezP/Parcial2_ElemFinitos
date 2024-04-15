@@ -4,6 +4,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pyvtk
 import meshpy.tet as tet
+from scipy.sparse import lil_matrix
+import vtk
 
 # PARTE 1
 dominio = np.zeros((10, 10, 10))
@@ -167,8 +169,6 @@ N = funcion_de_forma_tetraedro(xi, eta, zeta)
 print("Valores de la función de forma:", N)
 
 # PARTE 6
-import numpy as np
-
 def ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades):
     """
     Ensambla la matriz de rigidez global para una estructura mallada con tetraedros.
@@ -207,8 +207,68 @@ def calcular_matriz_rigidez_local(tetraedro, nodos, propiedades):
     Returns:
     - matriz_rigidez_local: Matriz de rigidez local del tetraedro.
     """
-    # Implementar el cálculo de la matriz de rigidez local (por ejemplo, utilizando el método de los elementos finitos)
+    # Propiedades del material
+    E = propiedades['E'] # Módulo de elasticidad
+    nu = propiedades['nu'] # Coeficiente de Poisson
+    
+    # Coordenadas de los nodos del tetraedro
+    x0, y0, z0 = nodos[tetraedro[0]]
+    x1, y1, z1 = nodos[tetraedro[1]]
+    x2, y2, z2 = nodos[tetraedro[2]]
+    x3, y3, z3 = nodos[tetraedro[3]]
+    
+    # Calculo de las derivadas de las funciones de forma
+    dN_dxi = np.array([-1, 1, 0, 0])
+    dN_deta = np.array([-1, 0, 1, 0])
+    dN_dzeta = np.array([-1, 0, 0, 1])
+    
+    # Jacobiano de la transformación
+    J = np.array([
+        [x1 - x0, x2 - x0, x3 - x0],
+        [y1 - y0, y2 - y0, y3 - y0],
+        [z1 - z0, z2 - z0, z3 - z0]
+    ])
+    detJ = np.linalg.det(J)
+   # Matriz de gradiente de deformaciones B
+    B = np.array([
+        [dN_dxi[0], 0, 0, dN_dxi[1], 0, 0, dN_dxi[2], 0, 0, dN_dxi[3], 0, 0],
+        [0, dN_deta[0], 0, 0, dN_deta[1], 0, 0, dN_deta[2], 0, 0, dN_deta[3], 0],
+        [0, 0, dN_dzeta[0], 0, 0, dN_dzeta[1], 0, 0, dN_dzeta[2], 0, 0, dN_dzeta[3]],
+        [dN_deta[0], dN_dxi[0], 0, dN_deta[1], dN_dxi[1], 0, dN_deta[2], dN_dxi[2], 0, dN_deta[3], dN_dxi[3], 0],
+        [0, dN_dzeta[0], dN_deta[0], 0, dN_dzeta[1], dN_deta[1], 0, dN_dzeta[2], dN_deta[2], 0, dN_dzeta[3], dN_deta[3]],
+        [dN_dzeta[0], 0, dN_dxi[0], dN_dzeta[1], 0, dN_dxi[1], dN_dzeta[2], 0, dN_dxi[2], dN_dzeta[3], 0, dN_dxi[3]]
+    ]) / detJ
 
+    # Matriz de elasticidad
+    factor = E / ((1 + nu) * (1 - 2 * nu))
+    C = factor * np.array([
+        [(1 - nu), nu, nu, 0, 0, 0],
+        [nu, (1 - nu), nu, 0, 0, 0],
+        [nu, nu, (1 - nu), 0, 0, 0],
+        [0, 0, 0, (1 - 2 * nu) / 2, 0, 0],
+        [0, 0, 0, 0, (1 - 2 * nu) / 2, 0],
+        [0, 0, 0, 0, 0, (1 - 2 * nu) / 2]
+    ])
+
+    # Matriz de rigidez local
+    matriz_rigidez_local = np.dot(np.dot(B.T, C), B) * detJ
+
+    return matriz_rigidez_local
+
+# Ejemplo de uso
+nodos = np.array([
+    [0, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1]
+])
+tetraedro = [0, 1, 2, 3]
+propiedades = {'E': 1e6, 'nu': 0.3}
+matriz_rigidez_local = calcular_matriz_rigidez_local(tetraedro, nodos, propiedades)
+print("Matriz de rigidez local:")
+print(matriz_rigidez_local)  
+   
+    
 def ensamblar_matriz_local(matriz_global, matriz_local, tetraedro):
     """
     Ensambla la matriz de rigidez local en la matriz de rigidez global.
@@ -218,8 +278,203 @@ def ensamblar_matriz_local(matriz_global, matriz_local, tetraedro):
     - matriz_local: Matriz de rigidez local.
     - tetraedro: Índices de nodos que forman el tetraedro.
     """
-    # Implementar el ensamblaje de la matriz local en la matriz global (teniendo en cuenta los nodos del tetraedro)
+    # Tamaño de la matriz global
+    num_nodos = matriz_global.shape[0]
+
+    # Convertir la matriz local a una matriz dispersa lil_matrix
+    matriz_local_sparse = lil_matrix(matriz_local)
+
+    # Índices de los nodos del tetraedro
+    i, j, k, l = tetraedro
+
+    # Ensamblar la matriz local en la matriz global
+    for m, n in enumerate([i, j, k, l]):
+        for p, q in enumerate([i, j, k, l]):
+            matriz_global[3*n:3*(n+1), 3*q:3*(q+1)] += matriz_local_sparse[3*m:3*(m+1), 3*p:3*(p+1)]
 
 # Ejemplo de uso
 # Se asume que nodos, tetraedros y propiedades están definidos
 # matriz_rigidez_global = ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades)
+
+# PARTE 7
+def resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas):
+    """
+    Resuelve el sistema de ecuaciones de equilibrio para un análisis estructural.
+
+    Args:
+    - matriz_rigidez_global: Matriz de rigidez global del sistema.
+    - fuerzas: Vector de fuerzas aplicadas al sistema.
+
+    Returns:
+    - desplazamientos: Vector de desplazamientos resultantes.
+    """
+    # Resolver el sistema de ecuaciones utilizando un método de solución directa
+    desplazamientos = np.linalg.solve(matriz_rigidez_global, fuerzas)
+    
+    return desplazamientos
+
+# Ejemplo de uso
+# Se asume que matriz_rigidez_global y fuerzas están definidos
+# desplazamientos = resolver_sistema_ecuaciones(matriz_rigidez_global, fuerzas)
+# print("Desplazamientos resultantes:")
+# print(desplazamientos)
+
+# PARTE 8
+# Suponiendo que ya tenemos los desplazamientos y la matriz de rigidez global
+
+import numpy as np
+
+def calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos, tetraedros, propiedades):
+    """
+    Calcula las tensiones y deformaciones en la estructura analizada.
+
+    Args:
+    - matriz_rigidez_global: Matriz de rigidez global del sistema.
+    - desplazamientos: Vector de desplazamientos resultantes.
+
+    Returns:
+    - tensiones: Vector de tensiones en los elementos de la estructura.
+    - deformaciones: Vector de deformaciones en los elementos de la estructura.
+    """
+    # Inicializar vectores de tensiones y deformaciones
+    tensiones = []
+    deformaciones = []
+
+    # Iterar sobre los tetraedros para calcular las tensiones y deformaciones en cada elemento
+    for tetraedro in tetraedros:
+        # Obtener las coordenadas de los nodos del tetraedro
+        coordenadas = np.array([nodos[i] for i in tetraedro])
+
+        # Calcular la matriz de deformación para el tetraedro actual
+        matriz_deformacion = calcular_matriz_deformacion(coordenadas)
+
+        # Calcular los desplazamientos nodales del tetraedro
+        desplazamientos_nodales = np.array([desplazamientos[3*i:3*(i+1)] for i in tetraedro])
+
+        # Calcular los desplazamientos nodales del tetraedro en coordenadas deformadas
+        desplazamientos_deformados = np.dot(matriz_deformacion, desplazamientos_nodales.flatten())
+
+        # Calcular las deformaciones en el tetraedro
+        deformaciones_elemento = calcular_deformaciones_elemento(matriz_deformacion, desplazamientos_nodales)
+
+        # Calcular las tensiones en el tetraedro
+        tensiones_elemento = calcular_tensiones_elemento(deformaciones_elemento, propiedades)
+
+        # Agregar las tensiones y deformaciones del elemento al vector global
+        tensiones.append(tensiones_elemento)
+        deformaciones.append(deformaciones_elemento)
+
+    return tensiones, deformaciones
+
+def calcular_matriz_deformacion(coordenadas):
+    """
+    Calcula la matriz de deformación para un tetraedro.
+
+    Args:
+    - coordenadas: Coordenadas de los nodos del tetraedro.
+
+    Returns:
+    - matriz_deformacion: Matriz de deformación del tetraedro.
+    """
+    # Implementar el cálculo de la matriz de deformación utilizando las coordenadas de los nodos
+
+def calcular_deformaciones_elemento(matriz_deformacion, desplazamientos_nodales):
+    """
+    Calcula las deformaciones en un elemento finito.
+
+    Args:
+    - matriz_deformacion: Matriz de deformación del elemento.
+    - desplazamientos_nodales: Desplazamientos nodales del elemento.
+
+    Returns:
+    - deformaciones_elemento: Deformaciones en el elemento.
+    """
+    # Calcular las deformaciones en el elemento utilizando la matriz de deformación y los desplazamientos nodales
+
+def calcular_tensiones_elemento(deformaciones_elemento, propiedades):
+    """
+    Calcula las tensiones en un elemento finito.
+
+    Args:
+    - deformaciones_elemento: Deformaciones en el elemento.
+    - propiedades: Propiedades del material del elemento.
+
+    Returns:
+    - tensiones_elemento: Tensiones en el elemento.
+    """
+    # Implementar el cálculo de las tensiones en el elemento utilizando las deformaciones y las propiedades del material
+
+# Ejemplo de uso
+# Se asume que nodos, tetraedros, matriz_rigidez_global y desplazamientos están definidos
+# tensiones, deformaciones = calcular_tensiones_deformaciones(matriz_rigidez_global, desplazamientos, nodos, tetraedros, propiedades)
+# print("Tensiones en los elementos:")
+# print(tensiones)
+# print("Deformaciones en los elementos:")
+# print(deformaciones)
+def visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, nombre_archivo):
+    """
+    Visualiza las tensiones y deformaciones en la estructura utilizando Paraview u otra herramienta de visualización.
+
+    Args:
+    - tensiones: Vector de tensiones en los elementos de la estructura.
+    - deformaciones: Vector de deformaciones en los elementos de la estructura.
+    """
+    # Crear un objeto vtkUnstructuredGrid para almacenar la geometría y los datos de los tetraedros
+    grid = vtk.vtkUnstructuredGrid()
+
+    # Crear un objeto vtkPoints para almacenar las coordenadas de los nodos
+    points = vtk.vtkPoints()
+
+    # Agregar los nodos al objeto vtkPoints
+    for nodo in nodos:
+        points.InsertNextPoint(nodo)
+
+    # Asignar los puntos al vtkUnstructuredGrid
+    grid.SetPoints(points)
+
+    # Crear un objeto vtkIntArray para almacenar las tensiones en los elementos
+    tensiones_array = vtk.vtkDoubleArray()
+    tensiones_array.SetNumberOfComponents(1)
+    tensiones_array.SetName("Tensiones")
+
+    # Agregar las tensiones al vtkIntArray
+    for tension in tensiones:
+        tensiones_array.InsertNextValue(tension)
+
+    # Añadir el array de tensiones al vtkUnstructuredGrid
+    grid.GetCellData().AddArray(tensiones_array)
+
+    # Crear un objeto vtkIntArray para almacenar las deformaciones en los elementos
+    deformaciones_array = vtk.vtkDoubleArray()
+    deformaciones_array.SetNumberOfComponents(1)
+    deformaciones_array.SetName("Deformaciones")
+
+    # Agregar las deformaciones al vtkIntArray
+    for deformacion in deformaciones:
+        deformaciones_array.InsertNextValue(deformacion)
+
+    # Añadir el array de deformaciones al vtkUnstructuredGrid
+    grid.GetCellData().AddArray(deformaciones_array)
+
+    # Crear un objeto vtkCellArray para almacenar los tetraedros
+    cell_array = vtk.vtkCellArray()
+
+    # Agregar los tetraedros al vtkCellArray
+    for tetraedro in tetraedros:
+        cell = vtk.vtkTetra()
+        for i, nodo_id in enumerate(tetraedro):
+            cell.GetPointIds().SetId(i, nodo_id)
+        cell_array.InsertNextCell(cell)
+
+    # Asignar los tetraedros al vtkUnstructuredGrid
+    grid.SetCells(vtk.VTK_TETRA, cell_array)
+
+    # Crear un escritor VTK y guardar el archivo
+    writer = vtk.vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(nombre_archivo)
+    writer.SetInputData(grid)
+    writer.Write()
+
+# Ejemplo de uso
+# Suponiendo que ya tenemos los datos necesarios (tensiones, deformaciones, nodos, tetraedros)
+# visualizar_resultados(tensiones, deformaciones, nodos, tetraedros, "resultados.vtk")
