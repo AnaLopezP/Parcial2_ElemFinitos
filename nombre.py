@@ -165,3 +165,61 @@ eta = 0.3
 zeta = 0.4
 N = funcion_de_forma_tetraedro(xi, eta, zeta)
 print("Valores de la función de forma:", N)
+
+# PARTE 6
+import numpy as np
+
+def ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades):
+    """
+    Ensambla la matriz de rigidez global para una estructura mallada con tetraedros.
+
+    Args:
+    - nodos: Coordenadas de los nodos del mallado.
+    - tetraedros: Índices de nodos que forman los tetraedros del mallado.
+    - propiedades: Propiedades del material y geometría de los tetraedros.
+
+    Returns:
+    - matriz_rigidez_global: Matriz de rigidez global ensamblada.
+    """
+    # Inicializar matriz de rigidez global
+    num_nodos = len(nodos)
+    matriz_rigidez_global = np.zeros((3*num_nodos, 3*num_nodos))
+    
+    # Iterar sobre los tetraedros y ensamblar la matriz de rigidez global
+    for tetraedro in tetraedros:
+        # Calcular matriz de rigidez local para el tetraedro actual
+        matriz_rigidez_local = calcular_matriz_rigidez_local(tetraedro, nodos, propiedades)
+        
+        # Ensamblar matriz de rigidez local en la matriz de rigidez global
+        ensamblar_matriz_local(matriz_rigidez_global, matriz_rigidez_local, tetraedro)
+    
+    return matriz_rigidez_global
+
+def calcular_matriz_rigidez_local(tetraedro, nodos, propiedades):
+    """
+    Calcula la matriz de rigidez local para un tetraedro.
+
+    Args:
+    - tetraedro: Índices de nodos que forman el tetraedro.
+    - nodos: Coordenadas de los nodos del mallado.
+    - propiedades: Propiedades del material y geometría del tetraedro.
+
+    Returns:
+    - matriz_rigidez_local: Matriz de rigidez local del tetraedro.
+    """
+    # Implementar el cálculo de la matriz de rigidez local (por ejemplo, utilizando el método de los elementos finitos)
+
+def ensamblar_matriz_local(matriz_global, matriz_local, tetraedro):
+    """
+    Ensambla la matriz de rigidez local en la matriz de rigidez global.
+
+    Args:
+    - matriz_global: Matriz de rigidez global.
+    - matriz_local: Matriz de rigidez local.
+    - tetraedro: Índices de nodos que forman el tetraedro.
+    """
+    # Implementar el ensamblaje de la matriz local en la matriz global (teniendo en cuenta los nodos del tetraedro)
+
+# Ejemplo de uso
+# Se asume que nodos, tetraedros y propiedades están definidos
+# matriz_rigidez_global = ensamblar_matriz_rigidez_global(nodos, tetraedros, propiedades)
